@@ -2,7 +2,7 @@
 
 A Python script to check for exposed Supabase tables by enumerating all REST-exposed tables, testing whether each table was readable, and safely dumping readable data as JSON (read-only).
 
-Related blog post: [How rep+ Helped Me Identify a Critical Supabase JWT Exposure]([https://bour.ch/blog](https://bour.ch/how-rep-helped-me-identify-a-critical-supabase-jwt-exposure/))
+Related blog post: [How rep+ Helped Me Identify a Critical Supabase JWT Exposure](https://bour.ch/how-rep-helped-me-identify-a-critical-supabase-jwt-exposure/)
 
 ## Setup
 
