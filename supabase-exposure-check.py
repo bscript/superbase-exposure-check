@@ -18,7 +18,15 @@ COMMON_HEADERS = {
 }
 
 JWT_REGEX = re.compile(r'eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+')
-SUPABASE_REGEX = re.compile(r'https://[a-z0-9-]+\.supabase\.co')
+# Standard Supabase cloud URLs
+SUPABASE_CLOUD_REGEX = re.compile(r'https://[a-z0-9-]+\.supabase\.co')
+# Common Supabase environment variable patterns (captures URL in group 1)
+SUPABASE_ENV_VAR_PATTERNS = [
+    # Patterns like: NEXT_PUBLIC_SUPABASE_URL:"https://..." or SUPABASE_URL: "https://..."
+    r'(?:NEXT_PUBLIC_|VITE_|REACT_APP_|PUBLIC_)?SUPABASE[_-]?URL["\']?\s*[:=]\s*["\']?(https://[^"\'\s,}]+)',
+    # Patterns like: "supabaseUrl": "https://..." or supabase_url: "https://..."
+    r'(?:["\']?)(?:supabaseUrl|supabase_url|supabaseURL)(?:["\']?\s*[:=]\s*["\']?)(https://[^"\'\s,}]+)',
+]
 
 # Sensitive field name patterns (case-insensitive) - must match exactly or as word boundaries
 SENSITIVE_FIELD_PATTERNS = [
@@ -152,6 +160,39 @@ def get_js_files(site_url):
 
     return list(js_files)
 
+def extract_supabase_urls(content):
+    """Extract Supabase URLs from JavaScript content, including custom domains."""
+    urls = set()
+    
+    # Extract standard .supabase.co URLs
+    urls.update(SUPABASE_CLOUD_REGEX.findall(content))
+    
+    # Extract URLs from common Supabase environment variable patterns
+    for pattern in SUPABASE_ENV_VAR_PATTERNS:
+        matches = re.finditer(pattern, content, re.IGNORECASE)
+        for match in matches:
+            url = match.group(1) if match.lastindex else match.group(0)
+            # Clean up the URL (remove trailing quotes, commas, brackets, etc.)
+            url = re.sub(r'["\',)}\]]+$', '', url)
+            # Remove any trailing slashes for consistency
+            url = url.rstrip('/')
+            if url.startswith('https://'):
+                urls.add(url)
+    
+    # Also look for URLs near Supabase-related keywords (for custom domains)
+    # Look for patterns like "supabase": "https://..." or supabaseUrl: "https://..."
+    supabase_keyword_pattern = r'(?:supabase|SUPABASE)["\'\s:=]+(https://[^"\'\s,}]+)'
+    matches = re.finditer(supabase_keyword_pattern, content, re.IGNORECASE)
+    for match in matches:
+        url = match.group(1)
+        url = re.sub(r'["\',)}\]]+$', '', url)
+        url = url.rstrip('/')
+        if url.startswith('https://') and '.supabase.co' not in url:
+            # Only add custom domains (not standard .supabase.co, already captured above)
+            urls.add(url)
+    
+    return list(urls)
+
 def scan_js(js_url):
     r = safe_get(js_url)
     if not r:
@@ -160,7 +201,7 @@ def scan_js(js_url):
     content = r.text
     return (
         JWT_REGEX.findall(content),
-        SUPABASE_REGEX.findall(content)
+        extract_supabase_urls(content)
     )
 
 # ================== VULNERABILITY ASSESSMENT ==================
